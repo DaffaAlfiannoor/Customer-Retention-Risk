@@ -1,0 +1,311 @@
+
+====================================================================================================
+CELL 16 fa1a1297 markdown
+====================================================================================================
+## 4.2 Pemeriksaan duplikat dan keunikan identifier
+
+**Tujuan.** Memastikan tidak ada baris duplikat dan memeriksa apakah identifier dapat membedakan entitas pada masing-masing sumber.
+
+**Temuan/Interpretasi.** Tidak adanya duplikat baris tidak otomatis berarti setiap dataset memiliki satu baris per customer. `member_id` pada data aktivitas harian merepresentasikan baris aktivitas pada file ini, sehingga belum cukup untuk menggabungkan data ke dataset customer-level lain. Penggabungan lintas-dataset tidak dilakukan tanpa mapping yang valid.
+
+====================================================================================================
+CELL 17 226244b7 code
+====================================================================================================
+identifier_columns = {
+    "DadosV3": "Id",
+    "gym_churn_us": None,
+    "daily_attendance": "member_id",
+    "membership_profile": "id",
+}
+
+duplicate_rows = []
+for dataset_name, dataset in datasets.items():
+    identifier = identifier_columns[dataset_name]
+    duplicate_rows.append(
+        {
+            "dataset": dataset_name,
+            "duplicate_rows": int(dataset.duplicated().sum()),
+            "identifier": identifier or "Tidak tersedia",
+            "identifier_unique": (
+                int(dataset[identifier].nunique()) if identifier else np.nan
+            ),
+            "identifier_duplicate_values": (
+                int(dataset[identifier].duplicated().sum()) if identifier else np.nan
+            ),
+        }
+    )
+
+duplicate_summary = pd.DataFrame(duplicate_rows)
+display(duplicate_summary)
+
+assert all(dataset.duplicated().sum() == 0 for dataset in datasets.values())
+
+====================================================================================================
+CELL 18 597e1e1f markdown
+====================================================================================================
+## 4.3 Pemeriksaan outlier numerik
+
+**Tujuan.** Menemukan nilai numerik yang jauh dari rentang kuartil untuk ditinjau lebih lanjut.
+
+**Pendekatan.** Outlier ditandai dengan aturan `Q1 - 1,5 × IQR` dan `Q3 + 1,5 × IQR`. Kolom biner dikeluarkan dari daftar karena aturan IQR tidak bermakna untuk variabel dengan domain `0/1`.
+
+**Temuan/Interpretasi.** Outlier bukan otomatis kesalahan data. Nilai ekstrem pada durasi membership, `DaysWithoutFrequency`, `LifetimeValue`, frekuensi kunjungan, atau durasi latihan perlu dipahami sebagai kemungkinan variasi perilaku customer. Nilai tersebut dipertahankan terlebih dahulu dan akan dipertimbangkan saat memilih transformasi atau model.
+
+====================================================================================================
+CELL 19 3e580cba code
+====================================================================================================
+def iqr_outlier_summary(dataset: pd.DataFrame) -> pd.DataFrame:
+    """Return IQR outlier counts for continuous numeric columns."""
+    numeric_columns = dataset.select_dtypes(include=np.number).columns
+    rows = []
+
+    for column in numeric_columns:
+        values = dataset[column].dropna()
+        unique_values = values.nunique()
+        is_binary = unique_values <= 2 and set(values.unique()).issubset({0, 1})
+        if is_binary or values.empty:
+            continue
+
+        q1, q3 = values.quantile([0.25, 0.75])
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        outlier_mask = (values < lower_bound) | (values > upper_bound)
+        outlier_count = int(outlier_mask.sum())
+
+        rows.append(
+            {
+                "column": column,
+                "outlier_count": outlier_count,
+                "outlier_pct": round(outlier_count / len(values) * 100, 2),
+                "lower_bound": round(lower_bound, 2),
+                "upper_bound": round(upper_bound, 2),
+                "min": round(values.min(), 2),
+                "max": round(values.max(), 2),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "column",
+                "outlier_count",
+                "outlier_pct",
+                "lower_bound",
+                "upper_bound",
+                "min",
+                "max",
+            ]
+        )
+
+    return pd.DataFrame(rows).sort_values(
+        "outlier_pct", ascending=False
+    ).reset_index(drop=True)
+
+outlier_summaries = {
+    dataset_name: iqr_outlier_summary(dataset)
+    for dataset_name, dataset in datasets.items()
+}
+
+for dataset_name, summary in outlier_summaries.items():
+    print(f"\n{dataset_name}")
+    if summary.empty:
+        print("Tidak ada kolom kontinu dengan outlier berdasarkan aturan IQR.")
+    else:
+        display(summary)
+
+====================================================================================================
+CELL 20 ed8cc293 markdown
+====================================================================================================
+## 4.4 Distribusi target dan class imbalance
+
+**Tujuan.** Mengukur proporsi kelas pada dataset yang memiliki target churn atau dropout.
+
+**Interpretasi metrik.** `minority_pct` menunjukkan proporsi kelas minoritas, sedangkan `imbalance_ratio` membandingkan jumlah kelas mayoritas dengan minoritas. Dataset dikategorikan sebagai imbalance ketika proporsi kelas minoritas cukup jauh dari 50%; keputusan akhir metrik dan strategi `class_weight` tetap dibuat setelah memahami tujuan bisnis dan biaya kesalahan prediksi.
+
+====================================================================================================
+CELL 21 fafe9640 code
+====================================================================================================
+target_columns = {
+    "DadosV3": "Dropout",
+    "gym_churn_us": "Churn",
+}
+
+target_rows = []
+for dataset_name, target_column in target_columns.items():
+    target_counts = datasets[dataset_name][target_column].value_counts(dropna=False)
+    majority_count = int(target_counts.max())
+    minority_count = int(target_counts.min())
+    minority_pct = minority_count / len(datasets[dataset_name]) * 100
+    imbalance_ratio = majority_count / minority_count
+
+    for target_class, class_count in target_counts.items():
+        target_rows.append(
+            {
+                "dataset": dataset_name,
+                "target": target_column,
+                "class": target_class,
+                "count": int(class_count),
+                "percentage": round(class_count / len(datasets[dataset_name]) * 100, 2),
+                "minority_pct": round(minority_pct, 2),
+                "imbalance_ratio": round(imbalance_ratio, 2),
+            }
+        )
+
+class_distribution = pd.DataFrame(target_rows)
+display(class_distribution)
+
+fig, axes = plt.subplots(1, len(target_columns), figsize=(12, 4))
+if len(target_columns) == 1:
+    axes = [axes]
+
+for axis, (dataset_name, target_column) in zip(axes, target_columns.items()):
+    distribution = datasets[dataset_name][target_column].value_counts().sort_index()
+    bars = axis.bar(
+        distribution.index.astype(str),
+        distribution.values,
+        color=["#2a78d6", "#e34948"],
+    )
+    axis.set_title(f"Distribusi {target_column}")
+    axis.set_xlabel("Kelas target")
+    axis.set_ylabel("Jumlah observasi")
+    axis.bar_label(bars, fmt="%d", padding=3)
+
+plt.tight_layout()
+plt.show()
+
+====================================================================================================
+CELL 22 ecfe71d4 markdown
+====================================================================================================
+### Temuan/Interpretasi
+
+- `DadosV3` memiliki 14.942 observasi dengan `Dropout=1` sebanyak 11.968 (80,1%) dan `Dropout=0` sebanyak 2.974 (19,9%). Kelas `Dropout=0` menjadi kelas minoritas dengan rasio mayoritas:minoritas sekitar 4,02:1.
+- `gym_churn_us` memiliki 4.000 observasi dengan `Churn=0` sebanyak 2.939 (73,5%) dan `Churn=1` sebanyak 1.061 (26,5%). Kelas `Churn=1` menjadi kelas minoritas dengan rasio sekitar 2,77:1.
+- Kedua dataset berlabel mengalami class imbalance. Oleh karena itu, evaluasi model tidak boleh hanya menggunakan accuracy. Balanced accuracy, precision, recall, F1-score, ROC-AUC, PR-AUC, dan confusion matrix perlu dipertimbangkan.
+- Dataset aktivitas harian dan profil membership tidak memiliki target churn/dropout, sehingga tidak dapat digunakan untuk menghitung distribusi target. Keduanya lebih tepat dipakai sebagai sumber analisis deskriptif atau feature engineering apabila tersedia mapping customer dan definisi label yang valid
+
+====================================================================================================
+CELL 23 59c49a4c markdown
+====================================================================================================
+# 5. Exploratory Data Analysis (EDA)
+
+## Tujuan
+
+EDA dilakukan untuk menjawab pertanyaan bisnis menggunakan pola yang ditemukan pada data, bukan hanya menampilkan statistik deskriptif.
+
+Analisis utama menggunakan `DadosV3` karena dataset ini memiliki target `Dropout` serta fitur customer-level yang berkaitan dengan kebutuhan monitoring, seperti inactivity, frekuensi kunjungan, pemakaian kuota kunjungan, kehadiran kelas, aktivitas, dan renewal.
+
+## Pendekatan
+
+EDA dilakukan tanpa menggabungkan dataset yang tidak memiliki mapping customer yang valid.
+
+- `DadosV3` digunakan sebagai dataset utama karena memiliki target `Dropout`.
+- `gym_churn_us` digunakan sebagai dataset pembanding karena memiliki target `Churn`.
+- `daily_gym_attendance_workout_data.csv` digunakan untuk analisis deskriptif aktivitas harian.
+- `Gym Membership Analysis.xlsx` digunakan untuk analisis deskriptif profil membership.
+
+Seluruh hubungan yang ditemukan pada EDA bersifat deskriptif dan tidak membuktikan hubungan sebab-akibat. Threshold monitoring yang digunakan pada tahap ini merupakan threshold eksploratif dan harus divalidasi kembali pada tahap preprocessing dan modeling.
+
+
+====================================================================================================
+CELL 24 d068360a markdown
+====================================================================================================
+## 5.1 Pertanyaan bisnis 1 — Customer stabil dan customer dengan penurunan engagement
+
+### Pertanyaan
+
+Customer mana yang menunjukkan pola aktivitas stabil dan customer mana yang mulai mengalami penurunan engagement?
+
+### Tujuan
+
+Membandingkan karakteristik aktivitas antara customer yang tidak dropout dan customer yang dropout untuk menemukan indikator awal penurunan engagement.
+
+### Pendekatan
+
+Fitur yang dibandingkan meliputi:
+
+- `DaysWithoutFrequency`
+- `AverageFrequency`
+- `Ratio`
+- `RealNumberOfVisits`
+- `AttendedClassesAverage`
+- `NumberOfRenewals`
+
+Perbandingan dilakukan menggunakan nilai mean, median, dan boxplot berdasarkan kelas `Dropout`.
+
+
+====================================================================================================
+CELL 25 407f32d9 code
+====================================================================================================
+engagement_features = [
+    "DaysWithoutFrequency",
+    "AverageFrequency",
+    "Ratio",
+    "RealNumberOfVisits",
+    "AttendedClassesAverage",
+    "NumberOfRenewals",
+]
+
+engagement_summary = (
+    main_df.groupby("Dropout")[engagement_features]
+    .agg(["mean", "median"])
+    .round(2)
+)
+
+display(engagement_summary)
+
+plot_features = [
+    "DaysWithoutFrequency",
+    "AverageFrequency",
+    "Ratio",
+    "RealNumberOfVisits",
+]
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+for axis, feature in zip(axes.flat, plot_features):
+    sns.boxplot(
+        data=main_df,
+        x="Dropout",
+        y=feature,
+        hue="Dropout",
+        palette={0: "#2a78d6", 1: "#e34948"},
+        legend=False,
+        showfliers=False,
+        ax=axis,
+    )
+    axis.set_title(f"{feature} berdasarkan status dropout")
+    axis.set_xlabel("Dropout (0 = tidak, 1 = ya)")
+    axis.set_ylabel(feature)
+
+plt.tight_layout()
+plt.show()
+
+
+====================================================================================================
+CELL 26 45afe10e markdown
+====================================================================================================
+## 5.2 Pertanyaan bisnis 2 — Apakah inactivity dan engagement berkaitan dengan dropout?
+
+### Pertanyaan
+
+Apakah inactivity, penurunan frekuensi kunjungan, dan attendance rate yang rendah berkaitan dengan peningkatan risiko dropout?
+
+### Tujuan
+
+Mengukur dropout rate pada beberapa segmen engagement yang mudah dipahami dan digunakan sebagai indikator monitoring.
+
+### Pendekatan
+
+Customer dikelompokkan berdasarkan:
+
+- Rentang `DaysWithoutFrequency`
+- Rentang `AverageFrequency`
+- Rentang `Ratio`
+
+Dropout rate dihitung di dalam setiap segmen. Penggunaan dropout rate membantu membandingkan segmen dengan jumlah customer yang berbeda.
+
+
+====================================================================================================
+CELL 27 901a0c8f code
+====================================================================================================
