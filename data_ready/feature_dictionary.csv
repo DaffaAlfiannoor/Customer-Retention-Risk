@@ -1,0 +1,23 @@
+feature_name,data_type,role,description,time_window,allowed_for_model_input,notes
+customer_id,object,identifier,Identifier customer untuk pelacakan baris.,Identifier atau future horizon,Tidak,Jangan masukkan ke fitur model.
+attendance_rate,float64,feature,Proporsi sesi historis yang dihadiri.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+recent_attendance_rate,float64,feature,Proporsi kehadiran pada 30 hari terakhir sebelum cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+attended_sessions,int64,feature,Jumlah sesi historis yang dihadiri.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+missed_sessions,int64,feature,Jumlah sesi historis yang tidak dihadiri.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+visit_frequency,float64,feature,Rata-rata jumlah kunjungan historis per minggu.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+attendance_trend,float64,feature,Perubahan attendance rate antara periode awal dan akhir histori.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+max_consecutive_absences,int64,feature,Jumlah maksimum ketidakhadiran berturut-turut.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+days_since_last_visit,int64,feature,Jumlah hari sejak kunjungan terakhir sampai cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+package_usage_ratio,float64,feature,Proporsi penggunaan sesi pada package aktif.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+days_to_package_expiry,int64,feature,Sisa hari package aktif sampai masa berlaku berakhir.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+renewal_count,int64,feature,Jumlah renewal yang terjadi sampai cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+reschedule_count,int64,feature,Jumlah reschedule sampai cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+reschedule_rate,float64,feature,Jumlah reschedule dibagi jumlah sesi historis.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+admin_contact_count,int64,feature,Jumlah interaksi admin sampai cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+inbound_contact_count,int64,feature,Jumlah interaksi yang dimulai customer.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+outbound_contact_count,int64,feature,Jumlah interaksi yang dimulai admin.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+no_response_count,int64,feature,Jumlah interaksi dengan outcome no response.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+follow_up_count,int64,feature,Jumlah interaksi dengan outcome follow-up.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+resolved_count,int64,feature,Jumlah interaksi dengan outcome resolved.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+package_type,object,feature,Jenis package aktif pada cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
+needs_follow_up,int8,target,"Target biner: 1 untuk At Risk atau Need Attention, 0 untuk Active.",Identifier atau future horizon,Tidak,Digunakan sebagai label.
