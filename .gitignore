@@ -1,1 +1,21 @@
+# Local Claude configuration
 .claude/
+
+# Raw/source data (keep local; may contain third-party or sensitive data)
+data_raw/
+
+# Generated model and export artifacts
+model_artifacts/
+data_ready.zip
+
+# Local logs and tool output
+logs-*.txt
+.playwright-mcp/
+.vscode/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+

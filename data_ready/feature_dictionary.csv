@@ -1,5 +1,5 @@
 feature_name,data_type,role,description,time_window,allowed_for_model_input,notes
-customer_id,object,identifier,Identifier customer untuk pelacakan baris.,Identifier atau future horizon,Tidak,Jangan masukkan ke fitur model.
+customer_id,str,identifier,Identifier customer untuk pelacakan baris.,Identifier atau future horizon,Tidak,Jangan masukkan ke fitur model.
 attendance_rate,float64,feature,Proporsi sesi historis yang dihadiri.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
 recent_attendance_rate,float64,feature,Proporsi kehadiran pada 30 hari terakhir sebelum cutoff.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
 attended_sessions,int64,feature,Jumlah sesi historis yang dihadiri.,Sampai 31 Maret 2025,Ya,Belum di-encode atau di-scale.
