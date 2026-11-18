@@ -1,5 +1,6 @@
 """Dashboard Customer Retention Risk Gymnasyum."""
 
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +11,8 @@ import pandas as pd
 import streamlit as st
 
 APP_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(APP_DIR.parent))
+from scoring import add_priority_score  # noqa: E402  (satu sumber aturan skor)
 DEFAULT_DATA_PATH = APP_DIR.parent / "data_ready" / "modeling_df.csv"
 
 ID_COLUMN = "customer_id"
@@ -170,32 +173,6 @@ section[data-testid="stSidebar"] h3 {
 .note { color: var(--soft); font-size: .74rem; line-height: 1.5; }
 </style>
 """
-
-
-def add_priority_score(frame: pd.DataFrame) -> pd.DataFrame:
-    """Add the transparent rule score used to rank customers for follow-up."""
-    scored = frame.copy()
-    scored["priority_score"] = (
-        (scored["attendance_rate"] < 0.60).astype(int)
-        + (scored["recent_attendance_rate"] < 0.60).astype(int)
-        + (scored["attendance_trend"] < 0).astype(int)
-        + (scored["max_consecutive_absences"] >= 3).astype(int)
-        + (scored["days_since_last_visit"] >= 7).astype(int)
-        + (scored["package_usage_ratio"] < 0.45).astype(int)
-        + (scored["reschedule_rate"] > 0.08).astype(int)
-        + (scored["admin_contact_count"] >= 3).astype(int)
-    )
-    scored["priority_band"] = pd.cut(
-        scored["priority_score"],
-        bins=[-0.1, 2, 5, 8],
-        labels=["Rendah", "Sedang", "Tinggi"],
-    )
-    scored["usage_segment"] = pd.cut(
-        scored["package_usage_ratio"],
-        bins=[-0.1, 0.40, 0.70, 1.1],
-        labels=["Rendah", "Sedang", "Tinggi"],
-    )
-    return scored
 
 
 @st.cache_data(show_spinner=False)
